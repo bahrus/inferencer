@@ -12,7 +12,7 @@ npm install inferencer assign-gingerly
 
 ## Overview
 
-The `inferencer` enhancement provides an attribute-less element enhancement API for smart value and display property assignment. Instead of manually determining which property to set on different element types (e.g., `value` for inputs, `checked` for checkboxes, `textContent` for divs), *inferencer* automatically infers the correct property based on the element type.
+The `inferencer` enhancement provides an attribute-less [element enhancement](https://github.com/bahrus/assign-gingerly#object-and-element-enhancements-via-assign-gingerly) API for smart value and display property assignment. Instead of manually determining which property to set on different element types (e.g., `value` for inputs, `checked` for checkboxes, `textContent` for divs), *inferencer* automatically infers the correct property based on the element type.
 
 ### Why inferencer?
 
@@ -32,7 +32,7 @@ The inferencer enhancement eliminates the need to remember these differences by 
 ## Basic Usage
 
 ```TypeScript
-import { value, display, registryItem } from 'inferencer';
+import { value, display, registryItem } from 'inferencer/inferencer.js';
 import 'assign-gingerly/object-extension.js';
 
 // Use the value symbol - automatically sets the right property

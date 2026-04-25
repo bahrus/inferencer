@@ -25,6 +25,10 @@
     ".": {
       "default": "./inferencer.js",
       "types": "./inferencer.ts"
+    },
+    "./inferencer.js": {
+      "default": "./inferencer.js",
+      "types": "./inferencer.ts"
     }
   },
   "main": "inferencer.js",
