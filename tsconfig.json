@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module":"ESNext",
+		"sourceMap": false,
+		"experimentalDecorators": false,
+		"newLine": "LF",
+		"strict": true,
+		"skipLibCheck": true
+	},
+	"include": [
+		"inferencer.ts"
+	],
+	"exclude":[
+		"node_modules/*"
+	]
+}

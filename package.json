@@ -13,8 +13,36 @@
   "license": "MIT",
   "author": "Bruce B. Anderson <anderson.bruce.b@gmail.com>",
   "type": "module",
+  "types": "types/inferencer/types.d.ts",
+  "files": [
+    "*.js",
+    "*.ts",
+    "README.md",
+    "LICENSE",
+    "types/inferencer/types.d.ts"
+  ],
+  "exports": {
+    ".": {
+      "default": "./inferencer.js",
+      "types": "./inferencer.ts"
+    }
+  },
   "main": "inferencer.js",
+  "module": "inferencer.js",
   "scripts": {
-    "test": "test playwright"
+    "serve": "node ./node_modules/spa-ssi/serve.js",
+    "test": "playwright test",
+    "update": "ncu -u && npm install",
+    "safari": "npx playwright wk http://localhost:8000",
+    "chrome": "npx playwright cr http://localhost:8000"
+  },
+  "dependencies": {
+    "assign-gingerly": "0.0.30"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1",
+    "spa-ssi": "0.0.27",
+    "@types/node": "25.6.0",
+    "typescript": "6.0.3"
   }
 }
