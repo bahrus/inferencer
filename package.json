@@ -1,0 +1,20 @@
+{
+  "name": "inferencer",
+  "version": "0.0.0",
+  "description": "DOM Element Enhancement that makes commonly used inferences",
+  "homepage": "https://github.com/bahrus/inferencer#readme",
+  "bugs": {
+    "url": "https://github.com/bahrus/inferencer/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bahrus/inferencer.git"
+  },
+  "license": "MIT",
+  "author": "Bruce B. Anderson <anderson.bruce.b@gmail.com>",
+  "type": "module",
+  "main": "inferencer.js",
+  "scripts": {
+    "test": "test playwright"
+  }
+}

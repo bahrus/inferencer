@@ -1,2 +1,2 @@
 # inferencer
-DOM Element Enhancer that makes commonly used inferences
+DOM Element Enhancement that makes commonly used inferences
