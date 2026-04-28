@@ -19,12 +19,15 @@ export const display = Symbol.for('assign-gingerly:display');
 export class Infer<TValue = any, TDisplay = any> {
     #weakRef: WeakRef<Element>;
 
+    #propName: string | undefined;
+
     get enhancedElement(){
         return this.#weakRef.deref()!;
     }
     
-    constructor(enhancedElement?: Element){
+    constructor(enhancedElement?: Element, propName?: string){
         this.#weakRef = new WeakRef(enhancedElement!);
+        this.#propName = propName;
     }
 
     #value: TValue | undefined;
@@ -59,12 +62,35 @@ export class Infer<TValue = any, TDisplay = any> {
         return inferEventType(this.enhancedElement);
     }
 
-    ['|'](itemPropName: string){
-        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${itemPropName}"]`))
-            .map(x => new Infer(x));
+    ['|'](itempropAttr: string){
+        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${itempropAttr}"]`))
+            .map(x => new Infer(x, itempropAttr));
     }
 
-    setValue(vm)
+    ['@'](nameAttr: string){
+        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${nameAttr}"]`))
+            .map(x => new Infer(x, nameAttr));
+    }
+
+    ['%'](partAttr: string){
+        return Array.from(this.enhancedElement.querySelectorAll(`[part~]="${partAttr}"]`))
+            .map(x => new Infer(x, partAttr));
+    }
+
+    ['#'](id: string){
+        return Array.from(this.enhancedElement.querySelectorAll(`#${id}`))
+            .map(x => new Infer(x, id));
+    }
+
+    ['.'](className: string){
+        return Array.from(this.enhancedElement.querySelectorAll(`.${className}`))
+            .map(x => new Infer(x, className));
+    }
+
+    setDisplay(vm: any){
+        const val = this.#propName ? vm[this.#propName] : inferBindingProperty(this.enhancedElement);
+        this.display = val;
+    }
 }
 
 /**
@@ -166,6 +192,10 @@ export function inferEventType(element: Element): string {
         default:
             return 'click';
     }
+}
+
+export function inferBindingProperty(element: Element): string {
+    return element.getAttribute('itemprop') || element.getAttribute('name') || element.getAttribute('id') || 'value';
 }
 
 export default registryItem;
