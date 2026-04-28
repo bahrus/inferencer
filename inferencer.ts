@@ -58,6 +58,13 @@ export class Infer<TValue = any, TDisplay = any> {
     get eventType(): string {
         return inferEventType(this.enhancedElement);
     }
+
+    ['|'](itemPropName: string){
+        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${itemPropName}"]`))
+            .map(x => new Infer(x));
+    }
+
+    setValue(vm)
 }
 
 /**
@@ -66,7 +73,7 @@ export class Infer<TValue = any, TDisplay = any> {
  */
 export const registryItem: EnhancementConfig = {
     spawn: Infer,
-    enhKey: 'infer',
+    enhKey: 'inferencer',
     symlinks: {
         [value]: 'value',
         [display]: 'display'
@@ -79,47 +86,38 @@ export const registryItem: EnhancementConfig = {
  * @returns The property name to use for value assignment
  */
 export function inferValueProperty(element: Element): string {
-    const tagName = element.localName;
+    const {localName} = element;
     
-    // Input elements - check type attribute
-    if (tagName === 'input') {
-        const type = element.getAttribute('type')?.toLowerCase();
-        if (type === 'checkbox' || type === 'radio') {
-            return 'checked';
+    switch (localName) {
+        case 'input': {
+            const type = element.getAttribute('type')?.toLowerCase();
+            switch (type) {
+                case 'checkbox':
+                case 'radio':
+                    return 'checked';
+                default:
+                    return 'value';
+            }
         }
-        return 'value';
+        case 'textarea':
+        case 'select':
+        case 'data':
+        case 'meter':
+        case 'progress':
+        case 'output':
+            return 'value';
+        case 'time':
+            return 'dateTime';
+        default: {
+            // Check for itemprop attribute as a hint
+            const itemprop = element.getAttribute('itemprop');
+            if (itemprop) {
+                //[TODO] this is wrong
+                return itemprop;
+            }
+            return 'textContent';
+        }
     }
-    
-    // Form controls with value property
-    if (tagName === 'textarea' || tagName === 'select') {
-        return 'value';
-    }
-    
-    // Semantic HTML elements with specific properties
-    if (tagName === 'time') {
-        return 'dateTime';
-    }
-    
-    if (tagName === 'data') {
-        return 'value';
-    }
-    
-    if (tagName === 'meter' || tagName === 'progress') {
-        return 'value';
-    }
-    
-    if (tagName === 'output') {
-        return 'value';
-    }
-    
-    // Check for itemprop attribute as a hint
-    const itemprop = element.getAttribute('itemprop');
-    if (itemprop) {
-        return itemprop;
-    }
-    
-    // Default fallback
-    return 'textContent';
 }
 
 /**
@@ -128,30 +126,21 @@ export function inferValueProperty(element: Element): string {
  * @returns The property name to use for display assignment
  */
 export function inferDisplayProperty(element: Element): string {
-    const tagName = element.localName;
+    const {localName} = element;
     
-    // Form controls display their value
-    if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-        return 'value';
+    switch (localName) {
+        case 'input':
+        case 'textarea':
+        case 'select':
+            return 'value';
+        case 'meter':
+        case 'progress':
+            return 'ariaValueText';
+        case 'time':
+        case 'data':
+        default:
+            return 'textContent';
     }
-    
-    // Time elements display formatted time
-    if (tagName === 'time') {
-        return 'textContent';
-    }
-    
-    // Data elements display human-readable content
-    if (tagName === 'data') {
-        return 'textContent';
-    }
-    
-    // Progress/meter elements use ARIA for display
-    if (tagName === 'meter' || tagName === 'progress') {
-        return 'ariaValueText';
-    }
-    
-    // Default fallback
-    return 'textContent';
 }
 
 /**
