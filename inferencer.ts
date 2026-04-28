@@ -150,30 +150,22 @@ export function inferDisplayProperty(element: Element): string {
  * @returns The event type name like 'input', 'change', 'click', 'submit'
  */
 export function inferEventType(element: Element): string {
-    const tagName = element.localName;
+    const {localName} = element;
     
-    // Form controls that support input event
-    if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-        return 'input';
+    switch (localName) {
+        case 'input':
+        case 'textarea':
+        case 'select':
+            return 'input';
+        case 'form':
+            return 'submit';
+        case 'details':
+            return 'toggle';
+        case 'dialog':
+            return 'close';
+        default:
+            return 'click';
     }
-    
-    // Form submission
-    if (tagName === 'form') {
-        return 'submit';
-    }
-    
-    // Details element
-    if (tagName === 'details') {
-        return 'toggle';
-    }
-    
-    // Dialog element
-    if (tagName === 'dialog') {
-        return 'close';
-    }
-    
-    // Default fallback for interactive elements
-    return 'click';
 }
 
 export default registryItem;
