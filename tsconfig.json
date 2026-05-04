@@ -9,7 +9,8 @@
 		"skipLibCheck": true
 	},
 	"include": [
-		"inferencer.ts"
+		"inferencer.ts",
+		"up.ts"
 	],
 	"exclude":[
 		"node_modules/*"

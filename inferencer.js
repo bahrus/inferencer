@@ -2,23 +2,25 @@
  * Symbol for smart value assignment
  * When used with element.set[value], it infers and sets the appropriate value property
  */
-export const value = Symbol.for('assign-gingerly:value');
+export const value = Symbol.for('inferencer:value');
 /**
  * Symbol for smart display assignment
  * When used with element.set[display], it infers and sets the appropriate display property
  */
-export const display = Symbol.for('assign-gingerly:display');
+export const display = Symbol.for('inferencer:display');
 /**
  * Enhancement class that provides smart value and display property inference
  * Automatically determines the correct property to set based on element type
  */
 export class Infer {
     #weakRef;
+    #propName;
     get enhancedElement() {
         return this.#weakRef.deref();
     }
-    constructor(enhancedElement) {
+    constructor(enhancedElement, propName) {
         this.#weakRef = new WeakRef(enhancedElement);
+        this.#propName = propName;
     }
     #value;
     get value() {
@@ -45,6 +47,30 @@ export class Infer {
     get eventType() {
         return inferEventType(this.enhancedElement);
     }
+    ['|'](itempropAttr) {
+        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${itempropAttr}"]`))
+            .map(x => new Infer(x, itempropAttr));
+    }
+    ['@'](nameAttr) {
+        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${nameAttr}"]`))
+            .map(x => new Infer(x, nameAttr));
+    }
+    ['%'](partAttr) {
+        return Array.from(this.enhancedElement.querySelectorAll(`[part~]="${partAttr}"]`))
+            .map(x => new Infer(x, partAttr));
+    }
+    ['#'](id) {
+        return Array.from(this.enhancedElement.querySelectorAll(`#${id}`))
+            .map(x => new Infer(x, id));
+    }
+    ['.'](className) {
+        return Array.from(this.enhancedElement.querySelectorAll(`.${className}`))
+            .map(x => new Infer(x, className));
+    }
+    setDisplay(vm) {
+        const val = this.#propName ? vm[this.#propName] : inferBindingProperty(this.enhancedElement);
+        this.display = val;
+    }
 }
 /**
  * Registry item for the Infer enhancement
@@ -52,7 +78,7 @@ export class Infer {
  */
 export const registryItem = {
     spawn: Infer,
-    enhKey: 'infer',
+    enhKey: 'inferencer',
     symlinks: {
         [value]: 'value',
         [display]: 'display'
@@ -64,39 +90,37 @@ export const registryItem = {
  * @returns The property name to use for value assignment
  */
 export function inferValueProperty(element) {
-    const tagName = element.localName;
-    // Input elements - check type attribute
-    if (tagName === 'input') {
-        const type = element.getAttribute('type')?.toLowerCase();
-        if (type === 'checkbox' || type === 'radio') {
-            return 'checked';
+    const { localName } = element;
+    switch (localName) {
+        case 'input': {
+            const type = element.getAttribute('type')?.toLowerCase();
+            switch (type) {
+                case 'checkbox':
+                case 'radio':
+                    return 'checked';
+                default:
+                    return 'value';
+            }
         }
-        return 'value';
+        case 'textarea':
+        case 'select':
+        case 'data':
+        case 'meter':
+        case 'progress':
+        case 'output':
+            return 'value';
+        case 'time':
+            return 'dateTime';
+        default: {
+            // Check for itemprop attribute as a hint
+            const itemprop = element.getAttribute('itemprop');
+            if (itemprop) {
+                //[TODO] this is wrong
+                return itemprop;
+            }
+            return 'textContent';
+        }
     }
-    // Form controls with value property
-    if (tagName === 'textarea' || tagName === 'select') {
-        return 'value';
-    }
-    // Semantic HTML elements with specific properties
-    if (tagName === 'time') {
-        return 'dateTime';
-    }
-    if (tagName === 'data') {
-        return 'value';
-    }
-    if (tagName === 'meter' || tagName === 'progress') {
-        return 'value';
-    }
-    if (tagName === 'output') {
-        return 'value';
-    }
-    // Check for itemprop attribute as a hint
-    const itemprop = element.getAttribute('itemprop');
-    if (itemprop) {
-        return itemprop;
-    }
-    // Default fallback
-    return 'textContent';
 }
 /**
  * Infer the most appropriate display property for an element
@@ -104,25 +128,20 @@ export function inferValueProperty(element) {
  * @returns The property name to use for display assignment
  */
 export function inferDisplayProperty(element) {
-    const tagName = element.localName;
-    // Form controls display their value
-    if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-        return 'value';
+    const { localName } = element;
+    switch (localName) {
+        case 'input':
+        case 'textarea':
+        case 'select':
+            return 'value';
+        case 'meter':
+        case 'progress':
+            return 'ariaValueText';
+        case 'time':
+        case 'data':
+        default:
+            return 'textContent';
     }
-    // Time elements display formatted time
-    if (tagName === 'time') {
-        return 'textContent';
-    }
-    // Data elements display human-readable content
-    if (tagName === 'data') {
-        return 'textContent';
-    }
-    // Progress/meter elements use ARIA for display
-    if (tagName === 'meter' || tagName === 'progress') {
-        return 'ariaValueText';
-    }
-    // Default fallback
-    return 'textContent';
 }
 /**
  * Infer the most appropriate event type for an element
@@ -131,24 +150,23 @@ export function inferDisplayProperty(element) {
  * @returns The event type name like 'input', 'change', 'click', 'submit'
  */
 export function inferEventType(element) {
-    const tagName = element.localName;
-    // Form controls that support input event
-    if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-        return 'input';
+    const { localName } = element;
+    switch (localName) {
+        case 'input':
+        case 'textarea':
+        case 'select':
+            return 'input';
+        case 'form':
+            return 'submit';
+        case 'details':
+            return 'toggle';
+        case 'dialog':
+            return 'close';
+        default:
+            return 'click';
     }
-    // Form submission
-    if (tagName === 'form') {
-        return 'submit';
-    }
-    // Details element
-    if (tagName === 'details') {
-        return 'toggle';
-    }
-    // Dialog element
-    if (tagName === 'dialog') {
-        return 'close';
-    }
-    // Default fallback for interactive elements
-    return 'click';
+}
+export function inferBindingProperty(element) {
+    return element.getAttribute('itemprop') || element.getAttribute('name') || element.getAttribute('id') || 'value';
 }
 export default registryItem;

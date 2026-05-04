@@ -4,13 +4,13 @@ import type { EnhancementConfig } from "assign-gingerly/types/assign-gingerly/ty
  * Symbol for smart value assignment
  * When used with element.set[value], it infers and sets the appropriate value property
  */
-export const value = Symbol.for('assign-gingerly:value');
+export const value = Symbol.for('inferencer:value');
 
 /**
  * Symbol for smart display assignment
  * When used with element.set[display], it infers and sets the appropriate display property
  */
-export const display = Symbol.for('assign-gingerly:display');
+export const display = Symbol.for('inferencer:display');
 
 /**
  * Enhancement class that provides smart value and display property inference
