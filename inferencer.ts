@@ -1,4 +1,4 @@
-import type { EnhancementConfig } from "assign-gingerly/types/assign-gingerly/types";
+import type { EnhancementConfig } from "./types/assign-gingerly/types";
 
 /**
  * Symbol for smart value assignment

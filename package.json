@@ -30,9 +30,9 @@
       "default": "./inferencer.js",
       "types": "./inferencer.ts"
     },
-    "./up.js": {
-      "default": "./up.js",
-      "types": "./up.ts"
+    "./upSearch.js": {
+      "default": "./upSearch.js",
+      "types": "./upSearch.ts"
     }
   },
   "main": "inferencer.js",

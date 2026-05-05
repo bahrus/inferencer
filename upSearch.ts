@@ -1,4 +1,4 @@
-export async function up(element: Element, id?: string){
+export async function upSearch(element: Element, id?: string){
     if(id){
         const target = (element.getRootNode() as DocumentFragment).getElementById(id);
         if(!target) throw 404;

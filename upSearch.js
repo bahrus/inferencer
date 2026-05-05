@@ -1,4 +1,4 @@
-export async function up(element, id) {
+export async function upSearch(element, id) {
     if (id) {
         const target = element.getRootNode().getElementById(id);
         if (!target)

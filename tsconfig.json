@@ -10,7 +10,7 @@
 	},
 	"include": [
 		"inferencer.ts",
-		"up.ts"
+		"upSearch.ts"
 	],
 	"exclude":[
 		"node_modules/*"
