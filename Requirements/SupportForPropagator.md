@@ -221,3 +221,11 @@ Start with the simplest cases and expand:
 2. Custom elements with roundabout propagator (already works)
 3. Input elements with hybrid event + setter approach
 4. Then tackle harder cases (iframe.src, etc.)
+
+---
+
+## Human Response I
+
+What are your thoughts on making class PropagatorInferencer the inferenced propagator?  First, maybe it should be renamed InferencedPropagator.  Second, it should extend EventTarget, and dispatch the events.  I think the constructor should be passed in the Infer class, so that it already has access the existing infer methods, like default event type, etc.
+
+It is true that some of the logic depends on which property is being observed.  I'm thinking the InferencedPropagor could override the addEventListener instead of the watchProperty method.  There is a tricky aspect as far as asynchronous logic in that method.  I'm thinking make the addEventListenr get a snapshot of the initial value, then do whatever asynchronous wiring is needed, then if the value changed, already dispatch an event with the property name.  Would this work?
