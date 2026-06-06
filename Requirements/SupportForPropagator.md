@@ -229,3 +229,140 @@ Start with the simplest cases and expand:
 What are your thoughts on making class PropagatorInferencer the inferenced propagator?  First, maybe it should be renamed InferencedPropagator.  Second, it should extend EventTarget, and dispatch the events.  I think the constructor should be passed in the Infer class, so that it already has access the existing infer methods, like default event type, etc.
 
 It is true that some of the logic depends on which property is being observed.  I'm thinking the InferencedPropagor could override the addEventListener instead of the watchProperty method.  There is a tricky aspect as far as asynchronous logic in that method.  I'm thinking make the addEventListenr get a snapshot of the initial value, then do whatever asynchronous wiring is needed, then if the value changed, already dispatch an event with the property name.  Would this work?
+
+---
+
+## Kiro Response I
+
+Both suggestions are strong improvements over the original design.
+
+### Renaming to InferencedPropagator + Extending EventTarget
+
+This is cleaner. The class *is* the propagator—it shouldn't contain one. Extending EventTarget directly means consumers interact with it exactly like they would with a native propagator from a roundabout element. No wrapper indirection, no `.getPropagator()` method on the inferencer itself. The `Infer.getPropagator()` just returns `this` (the InferencedPropagator) or the native propagator—same interface either way.
+
+Passing the `Infer` instance into the constructor is the right call. The `Infer` class already knows the element, has `inferEventType`, `inferValueProperty`, etc. No need to duplicate that logic or re-derive it.
+
+### Overriding `addEventListener` as the Wiring Entry Point
+
+This is elegant and solves the "which properties to watch" open question naturally—you only wire up observation for properties that someone actually subscribes to. Lazy by design.
+
+The async concern is real though, and your proposed solution handles it well. Here's how I'd refine the flow:
+
+```typescript
+export class InferencedPropagator extends EventTarget {
+    #infer: Infer;
+    #watchedProperties: Set<string> = new Set();
+    #abortController: AbortController = new AbortController();
+
+    constructor(infer: Infer) {
+        super();
+        this.#infer = infer;
+    }
+
+    override addEventListener(
+        type: string,
+        callback: EventListenerOrEventListenerObject | null,
+        options?: AddEventListenerOptions | boolean
+    ): void {
+        // Register the listener immediately so it's ready to receive
+        super.addEventListener(type, callback, options);
+
+        // Only wire up observation once per property
+        if (!this.#watchedProperties.has(type)) {
+            this.#watchedProperties.add(type);
+            this.#wireProperty(type);
+        }
+    }
+
+    async #wireProperty(propName: string): Promise<void> {
+        const element = this.#infer.enhancedElement;
+
+        // Snapshot current value before async work
+        const initialValue = (element as any)[propName];
+
+        // Do async wiring (MutationObserver setup, setter interception, etc.)
+        await this.#setupStrategy(propName);
+
+        // Check if value changed during setup—if so, dispatch immediately
+        const currentValue = (element as any)[propName];
+        if (currentValue !== initialValue) {
+            this.dispatchEvent(new Event(propName));
+        }
+    }
+
+    async #setupStrategy(propName: string): Promise<void> {
+        const element = this.#infer.enhancedElement;
+        const signal = this.#abortController.signal;
+
+        // Strategy 1: Attribute-reflected properties
+        // Use Infer's knowledge to check reflection...
+        
+        // Strategy 2: Native events (use infer.eventType)
+        // For input/textarea/select, the Infer class already 
+        // knows the relevant event type
+        
+        // Strategy 3: Setter interception for custom elements
+        
+        // Strategy 4: Polling fallback
+    }
+}
+```
+
+### Why This Works
+
+1. **`addEventListener` is synchronous** — the listener is registered immediately via `super.addEventListener()`, so it won't miss events.
+2. **Wiring is async but safe** — the snapshot/compare pattern catches changes that happen during setup. The only gap is a very brief window where a change might happen *and then revert* during async wiring, but that's an extreme edge case.
+3. **Event name = property name** — this mirrors the roundabout propagator convention. Consumers do `propagator.addEventListener('value', handler)` and it just works regardless of whether it's native or inferred.
+
+### One Consideration: Multiple `addEventListener` Calls for Same Property
+
+The `#watchedProperties` set prevents re-wiring, which is correct. But we should think about `removeEventListener` — if *all* listeners for a property are removed, should we tear down the watcher? This could matter for memory/performance. An option:
+
+- Track listener count per property
+- On `removeEventListener`, decrement and tear down if zero
+- Or: just keep watchers alive until `destroy()` is called (simpler, probably fine for most use cases)
+
+### Revised `Infer.getPropagator()`
+
+With this design, the integration simplifies to:
+
+```typescript
+export class Infer<TValue = any, TDisplay = any> {
+    #propagator: EventTarget | undefined;
+
+    async getPropagator(): Promise<EventTarget> {
+        if (this.#propagator) return this.#propagator;
+        
+        const {enhancedElement} = this;
+        const {localName} = enhancedElement;
+        
+        if (localName.includes('-')) {
+            await (
+                (enhancedElement as any).customElementRegistry || customElements
+            ).whenDefined(localName);
+            const {propagator} = enhancedElement as any;
+            if (propagator instanceof EventTarget) {
+                this.#propagator = propagator;
+                return propagator;
+            }
+        }
+        
+        // No native propagator — create an inferred one
+        const {InferencedPropagator} = await import('./InferencedPropagator.js');
+        this.#propagator = new InferencedPropagator(this);
+        return this.#propagator;
+    }
+}
+```
+
+Caching via `#propagator` ensures we don't create multiple instances for the same element.
+
+### Strategy Selection Leveraging Infer
+
+Since the constructor receives the `Infer` instance, the strategy selection can lean on existing inference logic:
+
+- `inferEventType(element)` tells us if there's a native event to listen to (Strategy 2)
+- `inferValueProperty(element)` tells us what property the element considers its "value" — useful for knowing which properties are likely attribute-reflected
+- The `localName` check for `-` (custom element detection) is already a pattern in the codebase
+
+This avoids duplicating element-type knowledge across two classes.
