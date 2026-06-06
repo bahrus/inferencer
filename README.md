@@ -152,6 +152,141 @@ console.log(form.enh.infer.eventType); // 'submit'
 
 This is particularly useful when building enhancements that need to attach event listeners but don't know the element type in advance.
 
+## Propagator Support
+
+The inferencer provides a `getPropagator()` method that returns an `EventTarget` which emits events when element properties change. This solves a common challenge: subscribing to property changes across different element types, whether the change is user-driven or programmatic.
+
+### Basic Usage
+
+```TypeScript
+import { Infer } from 'inferencer/inferencer.js';
+
+const input = document.createElement('input');
+const infer = new Infer(input);
+const propagator = await infer.getPropagator();
+
+// Listen for value changes — works for both user input and programmatic sets
+propagator.addEventListener('value', () => {
+    console.log('value changed to:', input.value);
+});
+
+input.value = 'programmatic change'; // fires the listener
+```
+
+The event name matches the property name being observed. Observation is lazy — wiring only happens for properties you actually subscribe to.
+
+### How It Works
+
+For **custom elements with a [roundabout](https://github.com/bahrus/roundabout) propagator**, `getPropagator()` returns the element's native propagator directly — no inference needed.
+
+For all other elements, it creates an `InferencedPropagator` that uses the best available strategy to detect changes:
+
+| Strategy | When Used | Mechanism |
+|----------|-----------|-----------|
+| Attribute observation | Properties that reflect to attributes (aria-*, href, src) | MutationObserver |
+| Hybrid event + setter | Form controls (input, textarea, select) | Native event + setter interception |
+| Setter interception | Custom elements with prototype setters | Instance property override |
+| Polling | Everything else (last resort) | requestAnimationFrame dirty check |
+
+### Attribute-Reflected Properties
+
+Properties like `ariaLabel`, `href`, and `src` that reflect to DOM attributes are observed via MutationObserver:
+
+```TypeScript
+const anchor = document.createElement('a');
+const infer = new Infer(anchor);
+const propagator = await infer.getPropagator();
+
+propagator.addEventListener('href', () => {
+    console.log('href changed to:', anchor.href);
+});
+
+anchor.href = 'https://example.com'; // fires the listener
+```
+
+### Form Controls (Hybrid Strategy)
+
+For `<input>`, `<textarea>`, and `<select>`, changes can come from user interaction (which fires native events) or programmatic assignment (which doesn't). The propagator handles both:
+
+```TypeScript
+const input = document.createElement('input');
+const infer = new Infer(input);
+const propagator = await infer.getPropagator();
+
+propagator.addEventListener('value', () => {
+    console.log('value is now:', input.value);
+});
+
+// User types → native 'input' event → propagator fires
+// Programmatic: input.value = 'hello' → setter intercept → propagator fires
+```
+
+### Custom Elements
+
+For custom elements with standard getters/setters on the prototype, setter interception catches all programmatic changes:
+
+```TypeScript
+class MyCounter extends HTMLElement {
+    #count = 0;
+    get count() { return this.#count; }
+    set count(v) { this.#count = v; }
+}
+customElements.define('my-counter', MyCounter);
+
+const el = document.createElement('my-counter');
+const infer = new Infer(el);
+const propagator = await infer.getPropagator();
+
+propagator.addEventListener('count', () => {
+    console.log('count changed to:', el.count);
+});
+
+el.count = 5; // fires the listener
+```
+
+### Roundabout Elements
+
+Custom elements that implement a [roundabout property](https://github.com/bahrus/roundabout) already have a native propagator. `getPropagator()` detects this and returns it directly:
+
+```TypeScript
+// Element with native propagator — no inference needed
+const el = document.createElement('my-roundabout-element');
+const infer = new Infer(el);
+const propagator = await infer.getPropagator();
+
+// This IS the element's own propagator, not an inferred one
+propagator.addEventListener('someProperty', handler);
+```
+
+### Cleanup
+
+Call `destroy()` to tear down all watchers when you're done:
+
+```TypeScript
+const propagator = await infer.getPropagator();
+propagator.addEventListener('value', handler);
+
+// Later, when no longer needed:
+propagator.destroy();
+```
+
+### Using InferencedPropagator Directly
+
+You can also import and use `InferencedPropagator` directly if you already have an `Infer` instance:
+
+```TypeScript
+import { InferencedPropagator } from 'inferencer/InferencedPropagator.js';
+import { Infer } from 'inferencer/inferencer.js';
+
+const element = document.createElement('input');
+const infer = new Infer(element);
+const propagator = new InferencedPropagator(infer);
+
+propagator.addEventListener('value', () => {
+    console.log('changed:', element.value);
+});
+```
+
 ## Accessing the Enhancement Instance
 
 The inferencer enhancement is accessible via `element.enh.infer`:
@@ -358,6 +493,7 @@ For browsers without scoped registry support, the enhancement falls back to the 
 - `inferValueProperty(element: Element): string` - Helper function to infer value property name
 - `inferDisplayProperty(element: Element): string` - Helper function to infer display property name
 - `inferEventType(element: Element): string` - Helper function to infer event type name
+- `InferencedPropagator: class` - (from `inferencer/InferencedPropagator.js`) EventTarget that infers property change detection
 
 ## License
 
