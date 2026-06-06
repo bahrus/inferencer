@@ -122,6 +122,11 @@ export class Infer<TValue = any, TDisplay = any> {
         const val = this.#propName ? vm[this.#propName] : inferBindingProperty(this.enhancedElement);
         this.display = val;
     }
+
+    get defaultRemoteBindingPropName(){
+        const {enhancedElement} = this;
+        return enhancedElement.getAttribute('itemprop') || enhancedElement.getAttribute('name') || enhancedElement.getAttribute('id') || 'value'
+    }
 }
 
 /**
