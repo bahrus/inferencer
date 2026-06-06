@@ -201,7 +201,7 @@ export class InferencedPropagator extends EventTarget {
             'href': ['a', 'area', 'link', 'base'],
             'src': ['img', 'script', 'iframe', 'audio', 'video', 'source', 'embed'],
             'action': ['form'],
-            'value': ['output', 'option', 'param', 'li'],
+            'value': ['option', 'param', 'li'],
         };
         const localName = element.localName;
         if (reflectedProps[propName]?.includes(localName)) return true;

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InferencedPropagator Tests</title>
+    <!-- #include virtual="/imports.html" -->
+</head>
+<body>
+    <h1>InferencedPropagator Tests</h1>
+    <div id="results"></div>
+    <div id="test-container"></div>
+
+    <script type="module">
+        import { Infer, inferEventType } from '../inferencer.js';
+        import { InferencedPropagator } from '../InferencedPropagator.js';
+
+        const results = [];
+        let testCount = 0;
+        let passCount = 0;
+        const container = document.getElementById('test-container');
+
+        function assert(condition, message) {
+            if (!condition) throw new Error(message);
+        }
+
+        function assertEqual(actual, expected, label) {
+            if (actual !== expected) {
+                throw new Error(`${label}: expected '${expected}', got '${actual}'`);
+            }
+        }
+
+        async function test(name, fn) {
+            testCount++;
+            try {
+                await fn();
+                passCount++;
+                results.push(`✓ ${name}`);
+                console.log(`✓ ${name}`);
+            } catch (error) {
+                results.push(`✗ ${name}: ${error.message}`);
+                console.error(`✗ ${name}:`, error);
+            }
+        }
+
+        // Helper: wait a tick for async wiring to complete
+        function tick() {
+            return new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        // Helper: wait for a rAF cycle (for polling strategy)
+        function raf() {
+            return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }
+
+        // ─── Constructor & Basic Shape ───────────────────────────────────
+
+        await test('should extend EventTarget', () => {
+            const input = document.createElement('input');
+            const infer = new Infer(input);
+            const propagator = new InferencedPropagator(infer);
+            assert(propagator instanceof EventTarget, 'should be instance of EventTarget');
+        });
+
+        await test('should have destroy method', () => {
+            const input = document.createElement('input');
+            const infer = new Infer(input);
+            const propagator = new InferencedPropagator(infer);
+            assert(typeof propagator.destroy === 'function', 'destroy should be a function');
+        });
+
+        // ─── Strategy 1: Attribute-Reflected Properties ──────────────────
+
+        await test('should detect aria property changes via MutationObserver', async () => {
+            const div = document.createElement('div');
+            container.appendChild(div);
+            const infer = new Infer(div);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('ariaLabel', () => { fired = true; });
+
+            await tick();
+
+            div.ariaLabel = 'hello';
+            // MutationObserver is async, wait a tick
+            await tick();
+            await tick();
+
+            assert(fired, 'should have dispatched event for ariaLabel change');
+            propagator.destroy();
+            container.removeChild(div);
+        });
+
+        await test('should detect href changes on anchor via attribute observation', async () => {
+            const a = document.createElement('a');
+            a.href = 'http://example.com';
+            container.appendChild(a);
+            const infer = new Infer(a);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('href', () => { fired = true; });
+
+            await tick();
+
+            a.href = 'http://example.org';
+            await tick();
+            await tick();
+
+            assert(fired, 'should have dispatched event for href change');
+            propagator.destroy();
+            container.removeChild(a);
+        });
+
+        await test('should detect output value changes via setter interception', async () => {
+            const output = document.createElement('output');
+            output.value = 'initial';
+            container.appendChild(output);
+            const infer = new Infer(output);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('value', () => { fired = true; });
+
+            await tick();
+
+            output.value = 'changed';
+            await tick();
+
+            assert(fired, 'should have dispatched event for output value change');
+            propagator.destroy();
+            container.removeChild(output);
+        });
+
+        // ─── Strategy 2: Hybrid (Native Event + Setter) ─────────────────
+
+        await test('should detect input value change from user event', async () => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            container.appendChild(input);
+            const infer = new Infer(input);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('value', () => { fired = true; });
+
+            await tick();
+
+            // Simulate user-driven input event
+            input.value = 'typed';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+
+            await tick();
+
+            assert(fired, 'should have dispatched event for user-driven input change');
+            propagator.destroy();
+            container.removeChild(input);
+        });
+
+        await test('should detect input value change from programmatic set', async () => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            container.appendChild(input);
+            const infer = new Infer(input);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('value', () => { fired = true; });
+
+            await tick();
+
+            // Programmatic change (no event dispatched by browser)
+            input.value = 'programmatic';
+
+            await tick();
+
+            assert(fired, 'should have dispatched event for programmatic input value change');
+            propagator.destroy();
+            container.removeChild(input);
+        });
+
+        await test('should detect checkbox checked change programmatically', async () => {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            container.appendChild(checkbox);
+            const infer = new Infer(checkbox);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('checked', () => { fired = true; });
+
+            await tick();
+
+            checkbox.checked = true;
+
+            await tick();
+
+            assert(fired, 'should have dispatched event for programmatic checked change');
+            propagator.destroy();
+            container.removeChild(checkbox);
+        });
+
+        // ─── Strategy 3: Setter Interception (Custom Elements) ───────────
+
+        await test('should detect property changes on custom element via setter interception', async () => {
+            // Define a simple custom element with a getter/setter
+            if (!customElements.get('test-prop-element')) {
+                class TestPropElement extends HTMLElement {
+                    #myProp = '';
+                    get myProp() { return this.#myProp; }
+                    set myProp(v) { this.#myProp = v; }
+                }
+                customElements.define('test-prop-element', TestPropElement);
+            }
+
+            const el = document.createElement('test-prop-element');
+            container.appendChild(el);
+            const infer = new Infer(el);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('myProp', () => { fired = true; });
+
+            await tick();
+
+            el.myProp = 'new value';
+
+            await tick();
+
+            assert(fired, 'should have dispatched event for custom element property change');
+            propagator.destroy();
+            container.removeChild(el);
+        });
+
+        await test('setter interception should preserve original behavior', async () => {
+            const el = document.createElement('test-prop-element');
+            container.appendChild(el);
+            const infer = new Infer(el);
+            const propagator = new InferencedPropagator(infer);
+
+            propagator.addEventListener('myProp', () => {});
+            await tick();
+
+            el.myProp = 'test value';
+            assertEqual(el.myProp, 'test value', 'getter should still return correct value');
+
+            propagator.destroy();
+            container.removeChild(el);
+        });
+
+        // ─── Strategy 4: Polling Fallback ────────────────────────────────
+
+        await test('should fall back to polling for unknown properties', async () => {
+            const div = document.createElement('div');
+            container.appendChild(div);
+            div.customThing = 'initial';
+            const infer = new Infer(div);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            propagator.addEventListener('customThing', () => { fired = true; });
+
+            await tick();
+
+            div.customThing = 'changed';
+
+            // Polling uses rAF, wait for a couple frames
+            await raf();
+            await raf();
+
+            assert(fired, 'should have dispatched event via polling for expando property');
+            propagator.destroy();
+            container.removeChild(div);
+        });
+
+        // ─── Lazy Wiring (only wire on addEventListener) ─────────────────
+
+        await test('should not wire anything until addEventListener is called', async () => {
+            const input = document.createElement('input');
+            container.appendChild(input);
+            const infer = new Infer(input);
+            const propagator = new InferencedPropagator(infer);
+
+            // No addEventListener called — changing value should not cause errors
+            input.value = 'no listener';
+            await tick();
+
+            // Now add listener
+            let fired = false;
+            propagator.addEventListener('value', () => { fired = true; });
+            await tick();
+
+            input.value = 'with listener';
+            await tick();
+
+            assert(fired, 'should dispatch after listener is wired');
+            propagator.destroy();
+            container.removeChild(input);
+        });
+
+        await test('should only wire once per property even with multiple listeners', async () => {
+            const input = document.createElement('input');
+            container.appendChild(input);
+            const infer = new Infer(input);
+            const propagator = new InferencedPropagator(infer);
+
+            let count = 0;
+            propagator.addEventListener('value', () => { count++; });
+            propagator.addEventListener('value', () => { count++; });
+            await tick();
+
+            input.value = 'multi';
+            await tick();
+
+            // Both listeners fire, but we only get one event dispatch per change
+            // Each listener sees the same event
+            assertEqual(count, 2, 'both listeners should fire');
+            propagator.destroy();
+            container.removeChild(input);
+        });
+
+        // ─── Snapshot / Initial Value Detection ──────────────────────────
+
+        await test('should dispatch if value changes during async wiring', async () => {
+            const div = document.createElement('div');
+            div.ariaLabel = 'before';
+            container.appendChild(div);
+            const infer = new Infer(div);
+            const propagator = new InferencedPropagator(infer);
+
+            let fired = false;
+            // Immediately change value — this may happen during wiring
+            propagator.addEventListener('ariaLabel', () => { fired = true; });
+            div.ariaLabel = 'during';
+
+            await tick();
+            await tick();
+
+            assert(fired, 'should have dispatched due to value change during setup');
+            propagator.destroy();
+            container.removeChild(div);
+        });
+
+        // ─── Cleanup / Destroy ───────────────────────────────────────────
+
+        await test('destroy should stop dispatching events', async () => {
+            const div = document.createElement('div');
+            div.ariaLabel = 'start';
+            container.appendChild(div);
+            const infer = new Infer(div);
+            const propagator = new InferencedPropagator(infer);
+
+            let count = 0;
+            propagator.addEventListener('ariaLabel', () => { count++; });
+            await tick();
+
+            div.ariaLabel = 'change1';
+            await tick();
+            await tick();
+
+            const countAfterFirst = count;
+            propagator.destroy();
+
+            div.ariaLabel = 'change2';
+            await tick();
+            await tick();
+
+            assertEqual(count, countAfterFirst, 'should not fire after destroy');
+            container.removeChild(div);
+        });
+
+        // ─── Infer.getPropagator() Integration ───────────────────────────
+
+        await test('Infer.getPropagator() should return an InferencedPropagator for built-in elements', async () => {
+            const input = document.createElement('input');
+            container.appendChild(input);
+            const infer = new Infer(input);
+            const propagator = await infer.getPropagator();
+
+            assert(propagator instanceof InferencedPropagator, 'should be InferencedPropagator');
+            propagator.destroy();
+            container.removeChild(input);
+        });
+
+        await test('Infer.getPropagator() should cache the propagator', async () => {
+            const input = document.createElement('input');
+            container.appendChild(input);
+            const infer = new Infer(input);
+            const p1 = await infer.getPropagator();
+            const p2 = await infer.getPropagator();
+
+            assert(p1 === p2, 'should return the same instance on subsequent calls');
+            p1.destroy();
+            container.removeChild(input);
+        });
+
+        await test('Infer.getPropagator() should return native propagator for roundabout elements', async () => {
+            // Define a custom element with a propagator property
+            if (!customElements.get('test-roundabout-el')) {
+                class TestRoundaboutEl extends HTMLElement {
+                    propagator = new EventTarget();
+                }
+                customElements.define('test-roundabout-el', TestRoundaboutEl);
+            }
+
+            const el = document.createElement('test-roundabout-el');
+            container.appendChild(el);
+            const infer = new Infer(el);
+            const propagator = await infer.getPropagator();
+
+            assert(propagator === el.propagator, 'should return native propagator from element');
+            assert(!(propagator instanceof InferencedPropagator), 'should NOT be InferencedPropagator');
+            container.removeChild(el);
+        });
+
+        // ─── Display results ─────────────────────────────────────────────
+
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `
+            <h2>Results: ${passCount}/${testCount} tests passed</h2>
+            <pre>${results.join('\n')}</pre>
+        `;
+
+        window.testResults = { passed: passCount, total: testCount, results };
+    </script>
+</body>
+</html>
