@@ -30,6 +30,10 @@
       "default": "./inferencer.js",
       "types": "./inferencer.ts"
     },
+    "./InferencedPropagator.js": {
+      "default": "./InferencedPropagator.js",
+      "types": "./InferencedPropagator.ts"
+    },
     "./upSearch.js": {
       "default": "./upSearch.js",
       "types": "./upSearch.ts"

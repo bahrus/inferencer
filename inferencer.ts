@@ -21,6 +21,8 @@ export class Infer<TValue = any, TDisplay = any> {
 
     #propName: string | undefined;
 
+    #propagator: EventTarget | undefined;
+
     get enhancedElement(){
         return this.#weakRef.deref()!;
     }
@@ -28,6 +30,35 @@ export class Infer<TValue = any, TDisplay = any> {
     constructor(enhancedElement?: Element, propName?: string){
         this.#weakRef = new WeakRef(enhancedElement!);
         this.#propName = propName;
+    }
+
+    /**
+     * Get a propagator (EventTarget) that emits events when properties change.
+     * For custom elements with a native propagator (roundabout), returns that directly.
+     * Otherwise, creates an InferencedPropagator that uses best-effort strategies
+     * to detect property changes.
+     */
+    async getPropagator(): Promise<EventTarget> {
+        if (this.#propagator) return this.#propagator;
+
+        const {enhancedElement} = this;
+        const {localName} = enhancedElement;
+
+        if (localName.includes('-')) {
+            await (
+                (enhancedElement as any).customElementRegistry || customElements
+            ).whenDefined(localName);
+            const {propagator} = enhancedElement as any;
+            if (propagator instanceof EventTarget) {
+                this.#propagator = propagator;
+                return propagator;
+            }
+        }
+
+        // No native propagator — create an inferred one
+        const {InferencedPropagator} = await import('./InferencedPropagator.js');
+        this.#propagator = new InferencedPropagator(this);
+        return this.#propagator;
     }
 
     #value: TValue | undefined;

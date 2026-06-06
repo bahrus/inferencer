@@ -10,6 +10,7 @@
 	},
 	"include": [
 		"inferencer.ts",
+		"InferencedPropagator.ts",
 		"upSearch.ts"
 	],
 	"exclude":[
