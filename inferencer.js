@@ -72,6 +72,13 @@ export class Infer {
     get eventType() {
         return inferEventType(this.enhancedElement);
     }
+    /**
+     * Get the inferred value property name for the element
+     * @returns The property name used for value assignment (e.g. 'value', 'checked', 'dateTime')
+     */
+    get valueProperty() {
+        return inferValueProperty(this.enhancedElement);
+    }
     ['|'](itempropAttr) {
         return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${itempropAttr}"]`))
             .map(x => new Infer(x, itempropAttr));
