@@ -188,6 +188,12 @@ export class InferencedPropagator extends EventTarget {
         if (localName === 'details' && propName === 'open') {
             return 'toggle';
         }
+        // contentEditable elements fire 'input' events on user edits
+        if (element instanceof HTMLElement && element.isContentEditable) {
+            if (propName === 'textContent' || propName === 'innerHTML' || propName === 'innerText') {
+                return 'input';
+            }
+        }
         return undefined;
     }
     /**
