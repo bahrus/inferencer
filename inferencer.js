@@ -134,6 +134,9 @@ export function inferValueProperty(element) {
                 case 'checkbox':
                 case 'radio':
                     return 'checked';
+                case 'number':
+                case 'range':
+                    return 'valueAsNumber';
                 default:
                     return 'value';
             }
