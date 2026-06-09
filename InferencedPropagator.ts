@@ -217,7 +217,7 @@ export class InferencedPropagator extends EventTarget {
         const {localName} = element;
         // Only applicable for form-like elements with value/checked properties
         if (['input', 'textarea', 'select'].includes(localName)) {
-            if (propName === 'value' || propName === 'checked' || propName === 'selectedIndex') {
+            if (propName === 'value' || propName === 'valueAsNumber' || propName === 'valueAsDate' || propName === 'checked' || propName === 'selectedIndex') {
                 return inferEventType(element);
             }
         }
