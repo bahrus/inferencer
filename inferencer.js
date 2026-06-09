@@ -150,6 +150,9 @@ export function inferValueProperty(element) {
             return 'value';
         case 'time':
             return 'dateTime';
+        case 'a':
+        case 'area':
+            return 'href';
         default: {
             // Check for itemprop attribute as a hint
             const itemprop = element.getAttribute('itemprop');

@@ -190,6 +190,13 @@ export class InferencedPropagator extends EventTarget {
      * Check if setting a property updates the corresponding attribute.
      */
     #isAttributeReflected(element: Element, propName: string, attrName: string): boolean {
+        // For form elements, 'value' attribute is only the default — property changes
+        // from user input do NOT update the attribute, so it's not truly reflected.
+        const {localName} = element;
+        if (propName === 'value' && ['input', 'textarea', 'select', 'button'].includes(localName)) {
+            return false;
+        }
+
         // Quick check: does the attribute currently exist or is the property known to reflect?
         if (element.hasAttribute(attrName)) return true;
 
@@ -203,7 +210,6 @@ export class InferencedPropagator extends EventTarget {
             'action': ['form'],
             'value': ['option', 'param', 'li'],
         };
-        const localName = element.localName;
         if (reflectedProps[propName]?.includes(localName)) return true;
 
         return false;
