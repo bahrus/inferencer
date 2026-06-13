@@ -208,6 +208,26 @@ export function inferEventType(element) {
             return 'click';
     }
 }
+/**
+ * Check if an element requires propagator-based observation for value changes.
+ * Elements like <data>, <meter>, <output>, <time> have no meaningful user-driven
+ * event for value changes — their values change programmatically and reflect to attributes.
+ * For these elements, consumers should use InferencedPropagator rather than raw addEventListener.
+ * @param element - The element to check
+ * @returns true if the element needs propagator-based observation
+ */
+export function needsPropagator(element) {
+    const { localName } = element;
+    switch (localName) {
+        case 'data':
+        case 'meter':
+        case 'output':
+        case 'time':
+            return true;
+        default:
+            return !localName.includes('-') && inferEventType(element) === 'click';
+    }
+}
 export function inferBindingProperty(element) {
     return element.getAttribute('itemprop') || element.getAttribute('name') || element.getAttribute('id') || 'value';
 }

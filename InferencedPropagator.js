@@ -161,6 +161,10 @@ export class InferencedPropagator extends EventTarget {
         if (propName === 'value' && ['input', 'textarea', 'select', 'button'].includes(localName)) {
             return false;
         }
+        // For <data>, <meter>, <output>, <progress> the value property reflects to the value attribute
+        if (propName === 'value' && ['data', 'meter', 'output', 'progress'].includes(localName)) {
+            return true;
+        }
         // Quick check: does the attribute currently exist or is the property known to reflect?
         if (element.hasAttribute(attrName))
             return true;
