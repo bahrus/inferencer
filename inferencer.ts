@@ -185,12 +185,6 @@ export function inferValueProperty(element: Element): string {
         case 'area':
             return 'href';
         default: {
-            // Check for itemprop attribute as a hint
-            const itemprop = element.getAttribute('itemprop');
-            if (itemprop) {
-                //[TODO] this is wrong
-                return itemprop;
-            }
             return 'textContent';
         }
     }
