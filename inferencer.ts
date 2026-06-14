@@ -141,8 +141,8 @@ export class Infer<TValue = any, TDisplay = any> {
  * Registry item for the Infer enhancement
  * Register this with customElements.enhancementRegistry to enable smart value/display assignment
  */
-export const registryItem: EnhancementConfig = {
-    spawn: Infer,
+export const registryItem: EnhancementConfig<any> = {
+    spawn: Infer as any,
     enhKey: 'inferencer',
     symlinks: {
         [value]: 'value',
