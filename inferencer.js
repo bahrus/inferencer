@@ -1,14 +1,17 @@
-import { withScopePerimeter } from './withScopePerimeter.js';
+import { withScopePerimeter } from "./withScopePerimeter.js";
 /**
  * Symbol for smart value assignment
+ * When used with element.set[value], it infers and sets the appropriate value property
  */
 export const value = Symbol.for('inferencer:value');
 /**
  * Symbol for smart display assignment
+ * When used with element.set[display], it infers and sets the appropriate display property
  */
 export const display = Symbol.for('inferencer:display');
 /**
  * Enhancement class that provides smart value and display property inference
+ * Automatically determines the correct property to set based on element type
  */
 export class Infer {
     #weakRef;
@@ -21,6 +24,12 @@ export class Infer {
         this.#weakRef = new WeakRef(enhancedElement);
         this.#propName = propName;
     }
+    /**
+     * Get a propagator (EventTarget) that emits events when properties change.
+     * For custom elements with a native propagator (roundabout), returns that directly.
+     * Otherwise, creates an InferencedPropagator that uses best-effort strategies
+     * to detect property changes.
+     */
     async getPropagator() {
         if (this.#propagator)
             return this.#propagator;
@@ -34,6 +43,7 @@ export class Infer {
                 return propagator;
             }
         }
+        // No native propagator — create an inferred one
         const { InferencedPropagator } = await import('./InferencedPropagator.js');
         this.#propagator = new InferencedPropagator(this);
         return this.#propagator;
@@ -56,9 +66,17 @@ export class Infer {
         const { enhancedElement } = this;
         enhancedElement[inferDisplayProperty(enhancedElement)] = nv;
     }
+    /**
+     * Get the inferred event type for the element
+     * @returns The most appropriate event type for this element
+     */
     get eventType() {
         return inferEventType(this.enhancedElement);
     }
+    /**
+     * Get the inferred value property name for the element
+     * @returns The property name used for value assignment (e.g. 'value', 'checked', 'dateTime')
+     */
     get valueProperty() {
         return inferValueProperty(this.enhancedElement);
     }
@@ -107,6 +125,7 @@ export class Infer {
 }
 /**
  * Registry item for the Infer enhancement
+ * Register this with customElements.enhancementRegistry to enable smart value/display assignment
  */
 export const registryItem = {
     spawn: Infer,
@@ -118,6 +137,8 @@ export const registryItem = {
 };
 /**
  * Infer the most appropriate value property for an element
+ * @param element - The element to infer the property for
+ * @returns The property name to use for value assignment
  */
 export function inferValueProperty(element) {
     // Non-empty itemscope → route through ish (itemscope manager)
@@ -159,6 +180,8 @@ export function inferValueProperty(element) {
 }
 /**
  * Infer the most appropriate display property for an element
+ * @param element - The element to infer the property for
+ * @returns The property name to use for display assignment
  */
 export function inferDisplayProperty(element) {
     const { localName } = element;
@@ -178,6 +201,9 @@ export function inferDisplayProperty(element) {
 }
 /**
  * Infer the most appropriate event type for an element
+ * Used when no explicit event type is provided
+ * @param element - The element to infer the event type for
+ * @returns The event type name like 'input', 'change', 'click', 'submit'
  */
 export function inferEventType(element) {
     const { localName } = element;
@@ -197,7 +223,14 @@ export function inferEventType(element) {
     }
 }
 /**
- * Check if an element requires propagator-based observation
+ * Check if an element requires propagator-based observation for value changes.
+ * Elements like <data>, <meter>, <output>, <time> have no meaningful user-driven
+ * event for value changes — their values change programmatically and reflect to attributes.
+ * Custom elements (names containing '-') should also use the propagator path, since they
+ * may expose a native propagator (EventTarget) for property change notification.
+ * For these elements, consumers should use InferencedPropagator rather than raw addEventListener.
+ * @param element - The element to check
+ * @returns true if the element needs propagator-based observation
  */
 export function needsPropagator(element) {
     const { localName } = element;
@@ -208,6 +241,8 @@ export function needsPropagator(element) {
         case 'time':
             return true;
         default:
+            // Custom elements should use propagator path — Infer.getPropagator()
+            // will check for a native propagator or fall back to InferencedPropagator
             if (localName.includes('-'))
                 return true;
             return inferEventType(element) === 'click';
