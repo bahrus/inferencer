@@ -81,38 +81,26 @@ export class Infer {
         return inferValueProperty(this.enhancedElement);
     }
     ['|'](itempropAttr, scopeBoundary = '[itemscope]') {
-        const candidates = this.enhancedElement.querySelectorAll(`[itemprop="${itempropAttr}"]`);
-        return Array.from(candidates)
-            .filter(el => withScopePerimeter(this.enhancedElement, el, scopeBoundary))
-            .map(x => new Infer(x, itempropAttr));
+        return this.#queryScoped(`[itemprop="${itempropAttr}"]`, itempropAttr, scopeBoundary);
     }
     ['@'](nameAttr, scopeBoundary) {
-        const candidates = this.enhancedElement.querySelectorAll(`[name="${nameAttr}"]`);
-        const filtered = scopeBoundary
-            ? Array.from(candidates).filter(el => withScopePerimeter(this.enhancedElement, el, scopeBoundary))
-            : Array.from(candidates);
-        return filtered.map(x => new Infer(x, nameAttr));
+        return this.#queryScoped(`[name="${nameAttr}"]`, nameAttr, scopeBoundary);
     }
     ['%'](partAttr, scopeBoundary) {
-        const candidates = this.enhancedElement.querySelectorAll(`[part~="${partAttr}"]`);
-        const filtered = scopeBoundary
-            ? Array.from(candidates).filter(el => withScopePerimeter(this.enhancedElement, el, scopeBoundary))
-            : Array.from(candidates);
-        return filtered.map(x => new Infer(x, partAttr));
+        return this.#queryScoped(`[part~="${partAttr}"]`, partAttr, scopeBoundary);
     }
     ['#'](id, scopeBoundary) {
-        const candidates = this.enhancedElement.querySelectorAll(`#${id}`);
-        const filtered = scopeBoundary
-            ? Array.from(candidates).filter(el => withScopePerimeter(this.enhancedElement, el, scopeBoundary))
-            : Array.from(candidates);
-        return filtered.map(x => new Infer(x, id));
+        return this.#queryScoped(`#${id}`, id, scopeBoundary);
     }
     ['.'](className, scopeBoundary) {
-        const candidates = this.enhancedElement.querySelectorAll(`.${className}`);
+        return this.#queryScoped(`.${className}`, className, scopeBoundary);
+    }
+    #queryScoped(selector, propName, scopeBoundary) {
+        const candidates = this.enhancedElement.querySelectorAll(selector);
         const filtered = scopeBoundary
             ? Array.from(candidates).filter(el => withScopePerimeter(this.enhancedElement, el, scopeBoundary))
             : Array.from(candidates);
-        return filtered.map(x => new Infer(x, className));
+        return filtered.map(x => new Infer(x, propName));
     }
     setDisplay(vm) {
         const val = this.#propName ? vm[this.#propName] : inferBindingProperty(this.enhancedElement);
