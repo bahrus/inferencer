@@ -1,3 +1,4 @@
+import { withScopePerimeter } from "./withScopePerimeter.js";
 /**
  * Symbol for smart value assignment
  * When used with element.set[value], it infers and sets the appropriate value property
@@ -79,25 +80,27 @@ export class Infer {
     get valueProperty() {
         return inferValueProperty(this.enhancedElement);
     }
-    ['|'](itempropAttr) {
-        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${itempropAttr}"]`))
-            .map(x => new Infer(x, itempropAttr));
+    ['|'](itempropAttr, scopeBoundary = '[itemscope]') {
+        return this.#queryScoped(`[itemprop="${itempropAttr}"]`, itempropAttr, scopeBoundary);
     }
-    ['@'](nameAttr) {
-        return Array.from(this.enhancedElement.querySelectorAll(`[itemprop="${nameAttr}"]`))
-            .map(x => new Infer(x, nameAttr));
+    ['@'](nameAttr, scopeBoundary) {
+        return this.#queryScoped(`[name="${nameAttr}"]`, nameAttr, scopeBoundary);
     }
-    ['%'](partAttr) {
-        return Array.from(this.enhancedElement.querySelectorAll(`[part~]="${partAttr}"]`))
-            .map(x => new Infer(x, partAttr));
+    ['%'](partAttr, scopeBoundary) {
+        return this.#queryScoped(`[part~="${partAttr}"]`, partAttr, scopeBoundary);
     }
-    ['#'](id) {
-        return Array.from(this.enhancedElement.querySelectorAll(`#${id}`))
-            .map(x => new Infer(x, id));
+    ['#'](id, scopeBoundary) {
+        return this.#queryScoped(`#${id}`, id, scopeBoundary);
     }
-    ['.'](className) {
-        return Array.from(this.enhancedElement.querySelectorAll(`.${className}`))
-            .map(x => new Infer(x, className));
+    ['.'](className, scopeBoundary) {
+        return this.#queryScoped(`.${className}`, className, scopeBoundary);
+    }
+    #queryScoped(selector, propName, scopeBoundary) {
+        const candidates = this.enhancedElement.querySelectorAll(selector);
+        const filtered = scopeBoundary
+            ? Array.from(candidates).filter(el => withScopePerimeter(this.enhancedElement, el, scopeBoundary))
+            : Array.from(candidates);
+        return filtered.map(x => new Infer(x, propName));
     }
     setDisplay(vm) {
         const val = this.#propName ? vm[this.#propName] : inferBindingProperty(this.enhancedElement);
@@ -126,6 +129,11 @@ export const registryItem = {
  * @returns The property name to use for value assignment
  */
 export function inferValueProperty(element) {
+    // Non-empty itemscope → route through ish (itemscope manager)
+    const itemscope = element.getAttribute('itemscope');
+    if (itemscope !== null && itemscope !== '') {
+        return 'ish';
+    }
     const { localName } = element;
     switch (localName) {
         case 'input': {
