@@ -89,6 +89,16 @@ export class Infer {
     get valueProperty() {
         return inferValueProperty(this.enhancedElement);
     }
+    /**
+     * The effective language for this element, honoring `lang` / `xml:lang`
+     * inheritance up through ancestors and shadow-root hosts, then
+     * `<html lang>` and finally `navigator.language`.
+     * @returns a BCP-47 tag, or undefined if nothing is resolvable
+     */
+    get lang() {
+        const el = this.#weakRef.deref();
+        return el === undefined ? undefined : resolveLang(el);
+    }
     ['|'](itempropAttr, scopeBoundary = '[itemscope]') {
         return this.#queryScoped(`[itemprop="${itempropAttr}"]`, itempropAttr, scopeBoundary);
     }
@@ -243,6 +253,39 @@ export function serializeForProperty(propName, nv) {
     if (nv !== null && typeof nv === 'object')
         return JSON.stringify(nv);
     return nv;
+}
+/**
+ * Resolve the effective language ("computed lang") for an element.
+ *
+ * There is no DOM accessor for this, so we walk: nearest ancestor element with a
+ * `lang` / `xml:lang` attribute, crossing shadow-root boundaries via the host
+ * (matching how `:lang()` behaves in modern browsers), then `<html lang>`, then
+ * `navigator.language`. Slot reprojection is intentionally not followed — HTML
+ * language inheritance is defined over the real node tree, not the flat tree.
+ *
+ * @returns a BCP-47 tag, or undefined if nothing is resolvable
+ */
+export function resolveLang(element) {
+    let node = element;
+    while (node != null) {
+        if (node.nodeType === 1 /* ELEMENT_NODE */) {
+            const el = node;
+            const lang = el.getAttribute('lang') || el.getAttribute('xml:lang');
+            if (lang)
+                return lang;
+            node = node.parentNode;
+        }
+        else if (node.nodeType === 11 /* DOCUMENT_FRAGMENT_NODE, incl. ShadowRoot */) {
+            node = node.host ?? null;
+        }
+        else {
+            node = null; // Document (9) or detached — stop
+        }
+    }
+    if (typeof document !== 'undefined' && document.documentElement.lang) {
+        return document.documentElement.lang;
+    }
+    return (typeof navigator !== 'undefined' && navigator.language) || undefined;
 }
 /**
  * Infer the most appropriate display property for an element
