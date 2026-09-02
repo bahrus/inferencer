@@ -50,12 +50,21 @@ export class Infer {
     }
     #value;
     get value() {
-        return this.#value;
+        const element = this.#weakRef.deref();
+        if (element === undefined)
+            return this.#value;
+        const propName = typeof this.#propName === 'string'
+            ? this.#propName
+            : inferValueProperty(element);
+        return coerceElementValue(element, propName);
     }
     set value(nv) {
         this.#value = nv;
         const { enhancedElement } = this;
-        enhancedElement[inferValueProperty(enhancedElement)] = nv;
+        const propName = typeof this.#propName === 'string'
+            ? this.#propName
+            : inferValueProperty(enhancedElement);
+        enhancedElement[propName] = serializeForProperty(propName, nv);
     }
     #display;
     get display() {
@@ -165,6 +174,75 @@ export function inferValueProperty(element) {
             return 'textContent';
         }
     }
+}
+/**
+ * Read the inferred value property off an element and coerce it to a natural
+ * JavaScript type, mirroring the legacy be-value-added parsing rules:
+ * - `<time>` (dateTime) -> Date (or undefined when empty)
+ * - `<input type=number|range>` (valueAsNumber) -> number (undefined when NaN)
+ * - `<input type=checkbox|radio>` (checked) -> boolean
+ * - schema.org `itemtype` hints (Number/Integer/Float/Boolean/Date/DateTime) are honored
+ * - `textContent` is returned verbatim
+ * - everything else is JSON-parsed when possible (so `<data value="123">` -> 123,
+ *   `<data value="true">` -> true), falling back to the raw string
+ */
+export function coerceElementValue(element, propName = inferValueProperty(element)) {
+    const raw = element[propName];
+    switch (propName) {
+        case 'valueAsNumber':
+            return Number.isNaN(raw) ? undefined : raw;
+        case 'valueAsDate':
+            return raw ?? undefined;
+        case 'checked':
+        case 'selectedIndex':
+            return raw;
+        case 'dateTime': {
+            const s = raw == null ? '' : String(raw);
+            return s === '' ? undefined : new Date(s);
+        }
+    }
+    if (raw == null)
+        return undefined;
+    if (typeof raw !== 'string')
+        return raw;
+    switch (element.getAttribute('itemtype')) {
+        case 'https://schema.org/Number': return Number(raw);
+        case 'https://schema.org/Integer': return parseInt(raw, 10);
+        case 'https://schema.org/Float': return parseFloat(raw);
+        case 'https://schema.org/Boolean': return raw === 'true' || raw === 'True';
+        case 'https://schema.org/Date':
+        case 'https://schema.org/DateTime': return new Date(raw);
+    }
+    if (propName === 'textContent')
+        return raw;
+    if (raw === '')
+        return undefined;
+    try {
+        return JSON.parse(raw);
+    }
+    catch {
+        return raw;
+    }
+}
+/**
+ * Serialize a JS value for assignment to a (usually string-typed) DOM value
+ * property, mirroring legacy be-value-added write-back:
+ * - DOM-typed properties (`checked`, `valueAsNumber`, `valueAsDate`) take the raw value
+ * - a `Date` is written as an ISO string (so `<time>.dateTime` round-trips)
+ * - plain objects / arrays are JSON-stringified
+ */
+export function serializeForProperty(propName, nv) {
+    switch (propName) {
+        case 'checked':
+        case 'valueAsNumber':
+        case 'valueAsDate':
+            return nv;
+    }
+    if (nv instanceof Date)
+        return nv.toISOString();
+    if (nv !== null && typeof nv === 'object')
+        return JSON.stringify(nv);
+    return nv;
 }
 /**
  * Infer the most appropriate display property for an element
