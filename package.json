@@ -23,20 +23,20 @@
   ],
   "exports": {
     ".": {
-      "default": "./inferencer.js",
-      "types": "./inferencer.ts"
+      "types": "./inferencer.ts",
+      "default": "./inferencer.js"
     },
     "./inferencer.js": {
-      "default": "./inferencer.js",
-      "types": "./inferencer.ts"
+      "types": "./inferencer.ts",
+      "default": "./inferencer.js"
     },
     "./InferencedPropagator.js": {
-      "default": "./InferencedPropagator.js",
-      "types": "./InferencedPropagator.ts"
+      "types": "./InferencedPropagator.ts",
+      "default": "./InferencedPropagator.js"
     },
     "./upSearch.js": {
-      "default": "./upSearch.js",
-      "types": "./upSearch.ts"
+      "types": "./upSearch.ts",
+      "default": "./upSearch.js"
     }
   },
   "main": "inferencer.js",
